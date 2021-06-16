@@ -1,0 +1,347 @@
+<?php
+declare(strict_types = 1);
+namespace ProcessWire;
+
+/**
+ * A module for publish/unpublish pages depending on time/date settings on per page base
+ * Uses LazyCron which will be triggered on page load
+ *
+ * @author Jürgen Kern
+ *
+ * ProcessWire 3.x
+ *
+ * http://www.processwire.com
+ * http://www.ryancramer.com
+ *
+ */
+
+class PublishingOptions extends WireData implements Module, ConfigurableModule
+{
+
+  protected $publishingOptionsTemplates = [];
+
+  public static function getModuleInfo()
+  {
+
+    return [
+      'title' => __('Publish/Unpublish pages'),
+      'summary' => __('Publish and unpublish pages depending on dates using LazyCron.'),
+      'author' => "Jürgen Kern",
+      'href' => 'https://github.com/juergenweb/PublishingOptions',
+      'version' => 1,
+      'singular' => true,
+      'autoload' => true,
+      'requires' => ['LazyCron',
+      'PHP>=7.0.0',
+      'ProcessWire>=3.0.0']
+    ];
+    
+  }
+
+  public function __construct()
+  {
+    if(wire('modules')->getConfig($this, 'input_templates') != null)
+      $this->publishingOptionsTemplates = wire('modules')->getConfig($this, 'input_templates');// set templates including publishing fields from config
+  }
+
+  public function init()
+  {
+    $this->addHook("LazyCron::{$this->input_croninterval}", $this, 'runPublishingOptions');
+    $this->addHookAfter('InputfieldDatetime::processInput', $this, 'validateDates');
+    $this->addHookBefore('Pages::save', $this, 'beforePageSave');
+    $this->addHookAfter('Pages::saved', $this, 'afterPageSaved');
+    $this->addHookBefore('ProcessModule::executeEdit', $this, 'addFieldsToTemplate');
+  }
+
+
+  /**
+  * Publish or unpublish pages including publishing fields depending on page settings
+  */
+
+  public function runPublishingOptions()
+  {
+    $templateSelector = count($this->publishingOptionsTemplates) ? 'template="'.implode('|',$this->publishingOptionsTemplates).'",' : '';
+    $unpublishedPages = wire("pages")->find("status=unpublished,'.$templateSelector.'(publish_from<=now, publish_until>=now), (publish_from<=now, publish_until='')");
+    $publishedPages = wire("pages")->find("status=published,'.$templateSelector.'(publish_from='', publish_until<=now), (publish_from>=now, publish_until<=now), (publish_from>=now, publish_until>=now)");
+    //$unpublishedPages = wire("pages")->find("status=unpublished, has_parent!=" . wire("config")->adminRootPageID . ", (publish_from<=now, publish_until>=now), (publish_from<=now, publish_until='')");
+    //$publishedPages = wire("pages")->find("status=published, has_parent!=" . wire("config")->adminRootPageID . ", (publish_from='', publish_until<=now), (publish_from>=now, publish_until<=now), (publish_from>=now, publish_until>=now)");
+    $results = $unpublishedPages->import($publishedPages);
+
+    foreach($results as $p){
+         $p->setOutputFormatting(false);
+         if($p->isUnpublished()){
+           $p->removeStatus(Page::statusUnpublished);
+         } else {
+           $p->addStatus(Page::statusUnpublished);
+         }
+         $p->save();
+    }
+  }
+
+
+  /**
+  * Method to validate if publish_until is after publish_from, otherwise show an error at the publish_until field
+  * @param HookEvent $event
+  */
+
+  protected function validateDates(HookEvent $event)
+  {
+    $field = $event->object;
+
+    if($field->name == 'publish_from' || $field->name == 'publish_until') {
+      $from = '';// publish_from date
+		  $until = '';// publish_until date
+		  $session = $this->wire('session');
+
+      if($field->name == 'publish_from') {
+  			$from = $field->value;
+  			$session->set('from', $from);
+		  } elseif($field->name == 'publish_until') {
+			  $until = $field->value;
+			  $from = $session->get('from');
+  			// compare publish_from and publish_until date
+  			if(($from && $until) && ($from >= $until)) {
+          $field->error(__('Publish until date must be after publish from date.'));
+        }
+  			// delete the temporary session
+  			$session->remove('from');
+		  }
+    }
+  }
+
+
+  /**
+  * Method runs before page is saved
+  * Set page status to unpublished during the save process if publish_from is in the future or publish_until is in the past
+  * @param HookEvent $event
+  */
+
+  protected function beforePageSave(HookEvent $event)
+  {
+    $page = $event->arguments(0);
+    if(($page->publish_from) && ($page->publish_from > time()) || ($page->publish_until) && ($page->publish_until < time())){
+      $page->addStatus(Page::statusUnpublished);
+      $page->publish_from = NULL;
+    } else {
+      if(!$page->publish_from){
+        $page->publish_from = time();
+      }
+    }
+  }
+
+
+  /**
+  * Method runs after page is saved
+  * Set value of publish_from field to null if page has status unpublished
+  * @param HookEvent $event
+  */
+
+  public function afterPageSaved(HookEvent $event)
+  {
+    $page = $event->arguments(0);
+    if($page->is(Page::statusUnpublished))
+      $page->publish_from = NULL;
+  }
+
+
+  /**
+  * Add or remove publishing fields from templates after saving the module config
+  */
+
+  protected function addFieldsToTemplate()
+  {
+    $publish_from = wire('fields')->get('publish_from');
+    $publish_until = wire('fields')->get('publish_until');
+    $publish_open = wire('fields')->get('publish_open');
+    $publish_close = wire('fields')->get('publish_open'.FieldtypeFieldsetOpen::fieldsetCloseIdentifier);
+
+      foreach($this->getTemplates() as $template){
+        $currentTempl = wire('templates')->get($template);
+        if(in_array($template, $this->publishingOptionsTemplates)){
+          if(!$currentTempl->hasField('publish_from')){
+            //not present so add this 2 fields to the template
+            $currentTempl->fieldgroup->add($publish_open);
+            $currentTempl->fieldgroup->add($publish_from);
+            $currentTempl->fieldgroup->add($publish_until);
+            $currentTempl->fieldgroup->add($publish_close);
+          }
+        } else {
+          $currentTempl->fieldgroup->remove('publish_open');
+          $currentTempl->fieldgroup->remove('publish_from');
+          $currentTempl->fieldgroup->remove('publish_until');
+          $currentTempl->fieldgroup->remove('publish_open'.FieldtypeFieldsetOpen::fieldsetCloseIdentifier);
+        }
+
+        $currentTempl->fieldgroup->save();
+      }
+
+  }
+
+
+/*
+  protected static function uninstallAllowed()
+  {
+    $fieldsInTemplate = [];
+    $moduleFields = ['publish_from', 'publish_until', 'publish_open', 'publish_open'.FieldtypeFieldsetOpen::fieldsetCloseIdentifier];
+    foreach($moduleFields as $moduleField){
+      $field = wire('fields')->get($moduleField);
+      if($field && $field->numFieldgroups() > 0)
+  			$fieldsInTemplate[] = $moduleField;
+      }
+
+    if(count($fieldsInTemplate)){
+
+
+      return true;
+    }
+    return false;
+  }
+*/
+
+  /**
+  * Module configuration
+  */
+
+  /**
+  * Get all frontend templates as a numeric array with template name as value
+  * @return array
+  */
+
+  protected function getTemplates(): array
+  {
+    $templates = [];
+    foreach(wire('templates')->find('flags!="8"') as $template){
+      $value = 0;
+      if(($template->hasField('publish_from')) && ($template->hasField('publish_until')))
+        $value = 1;
+      $templates[] = $template->name;
+    }
+    return $templates;
+  }
+
+
+  // Add additional configuration fields
+
+  public function ___getModuleConfigInputfields($inputfields)
+  {
+
+    // create array of intervals
+    $intervals = [
+  		'every30Seconds' => __('Every 30 seconds'),
+  		'everyMinute' => __('Every minute'),
+  		'every2Minutes' => __('Every 2 minutes'),
+  		'every3Minutes' => __('Every 3 minutes'),
+  		'every4Minutes' => __('Every 4 minutes'),
+  		'every5Minutes' => __('Every 5 minutes'),
+  		'every10Minutes' => __('Every 10 minutes'),
+  		'every15Minutes' => __('Every 15 minutes'),
+  		'every30Minutes' => __('Every 30 minutes'),
+  		'every45Minutes' => __('Every 45 minutes'),
+  		'everyHour' => __('Every hour'),
+  		'every2Hours' => __('Every 2 hours'),
+  		'every4Hours' => __('Every 4 hours'),
+  		'every6Hours' => __('Every 6 hours'),
+  		'every12Hours' => __('Every 12 hours'),
+  		'everyDay' => __('Every day'),
+  		'every2Days' => __('Every 2 days'),
+  		'every4Days' => __('Every 4 days'),
+  		'everyWeek' => __('Every week'),
+  		'every2Weeks' => __('Every 2 weeks'),
+  		'every4Weeks' => __('Every 4 weeks'),
+    ];
+
+    // create select to choose the interval
+    $f = $this->modules->get('InputfieldSelect');
+    $f->label = __('Cron Interval');
+    $f->attr('name', 'input_croninterval');
+    $f->addOptions($intervals);
+    $f->attr("value", $this->input_croninterval ? $this->input_croninterval : 'everyHour'); // default is 1 hour
+    $f->required = 1;
+    $inputfields->append($f);
+
+    // create checkboxes for each frontend template to add or remove publish_from and publish_until fields from this field
+    $f = $this->modules->get('InputfieldCheckboxes');
+    $f->label = __('Add fields to templates');
+    $f->attr('name', 'input_templates');
+    $values = (isset($this->hasField->data['input_required'])) ? $this->hasField->data['input_required'] : [];
+    //$templatesFields = wire('modules')->getConfig($this, 'input_templates');
+      foreach($this->getTemplates() as $templateName) {
+        $checked = ($this->publishingOptionsTemplates != null && in_array($templateName, $this->publishingOptionsTemplates)) ? 'checked' : '';
+        $f->addOption($templateName, $templateName, ['checked' => $checked]);
+      }
+    //}
+    $f->description = __('If a template is checked, than the publishing fields are present in this template or will be added to this template after pressing the save button. On all other templates these fields are not present or will be removed after pressing the save button.');
+    $f->notes = __('Please select all templates where you want to add the publishing fields and press the save button afterwards.');
+    $inputfields->append($f);
+
+  }
+
+
+  /**
+  * Install necessary fields if they are not present
+  */
+
+  public function ___install()
+  {
+	// Add the required fields for this module
+    if(!wire('fields')->get('publish_from')){
+      $field = new Field();
+  		$field->type = $this->modules->get("FieldtypeDatetime");
+  		$field->name = 'publish_from';
+  		$field->label =  __('Publish From Date');
+  		$field->dateOutputFormat = 'd-m-Y H:i:s';
+  		$field->dateInputFormat = 'd-M-Y';
+  		$field->datepicker = 3; // if you want datepicker enabled
+      $field->timeInputFormat = 'H:i';
+      $field->yearRange= '+0:+10';
+  		$field->defaultToday = 0; // if you want dates to default to today
+      $field->columnWidth = 50;
+  		$field->save();
+    }
+
+    if(!wire('fields')->get('publish_until')){
+      $field = new Field();
+  		$field->type = $this->modules->get("FieldtypeDatetime");
+  		$field->name = 'publish_until';
+  		$field->label =  __('Publish Until Date');
+  		$field->dateOutputFormat = 'd-m-Y H:i:s';
+  		$field->dateInputFormat = 'd-M-Y';
+  		$field->datepicker = 3; // if you want datepicker enabled
+      $field->timeInputFormat = 'H:i';
+      $field->yearRange= '+0:+10';
+  		$field->defaultToday = 0; // if you want dates to default to today
+      $field->columnWidth = 50;
+  		$field->save();
+    }
+
+    // create fieldset
+    if(!wire('fields')->get('publish_open')){
+      $opener = new Field();
+      $opener->type = new FieldtypeFieldsetOpen();
+      $opener->name = "publish_open";
+      $opener->label = __('Publishing options');
+      $opener->save();
+
+      $closer = new Field();
+      $closer->type = new FieldtypeFieldsetClose();
+      $closer->name = "publish_open" . FieldtypeFieldsetOpen::fieldsetCloseIdentifier;
+      $closer->save();
+    }
+
+	}
+
+
+	public function ___uninstall()
+  {
+	// Remove the module's fields if the module is uninstalled
+    $moduleFields = ['publish_from', 'publish_until', 'publish_open', 'publish_open'.FieldtypeFieldsetOpen::fieldsetCloseIdentifier];
+    foreach($moduleFields as $moduleField){
+      $field = wire('fields')->get($moduleField);
+      if($field && $field->numFieldgroups() > 0)
+  			throw new WireException(sprintf(__("Cannot uninstall because the field %s is still being used. Please remove the fields %s from any templates."), $moduleField, implode(', ', $moduleFields)));
+      if($field)
+        wire('fields')->delete($field);
+    }
+	}
+
+}
