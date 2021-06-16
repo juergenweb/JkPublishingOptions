@@ -12,3 +12,5 @@ This module is inspired by the SchedulePages module, but the code is completely 
 
 ## Template view
 ![alt text](https://raw.githubusercontent.com/juergenweb/PublishingOptions/main/form.jpg)
+
+As you can see the inputs are side by side inside a fieldset.
