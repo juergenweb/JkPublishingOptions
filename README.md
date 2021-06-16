@@ -27,7 +27,7 @@ If you enter only a publish from date means that the page will be visible from t
 If you enter only a publish until date means that the page will be visible immidiately after publishing til the end date.
 Entering both, start and end date means that the page is visible in the time range in between.
 
-This module publish or unpublish a page according to its settings.
+So this module publishes or unpublishes a page according to its settings.
 
 ## How to install
 
