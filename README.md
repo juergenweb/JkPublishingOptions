@@ -8,7 +8,7 @@ This module is inspired by the SchedulePages module, but the code is completely 
 * You can add/remove these fields from specific templates in the module configuration - no need to add them manually to templates
 
 ## Module configuration fields
-![alt text](https://github.com/juergenweb/PublishingOptions/blob/master/configuration.jpg)
+![alt text](https://raw.githubusercontent.com/juergenweb/PublishingOptions/main/configuration.jpg)
 
 ## Template view
 ![alt text](https://github.com/juergenweb/PublishingOptions/blob/master/form.jpg)
