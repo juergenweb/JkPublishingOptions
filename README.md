@@ -22,12 +22,14 @@ So there is no longer the need to add or remove the publishing fields manually t
 As you can see the inputs are side by side inside a fieldset.
 
 ## Usage
-Entering values inside the 2 date fields is optional. No values means that the page will be visible after publishing without restrictions.
-If you enter only a publish from date means that the page will be visible from this date on and has no enddate.
-If you enter only a publish until date means that the page will be visible immidiately after publishing til the end date.
-Entering both, start and end date means that the page is visible in the time range in between.
+Entering values inside the 2 date fields is optional.
 
-So this module publishes or unpublishes a page according to its settings.
+* No values means that the page will be visible after publishing without restrictions.
+* If you enter only a publish from date means that the page will be visible from this date on and has no enddate.
+* If you enter only a publish until date means that the page will be visible immidiately after publishing til the end date.
+* Entering both, start and end date means that the page is visible in the time range in between.
+
+So this module publishes or unpublishes a page according to the dates you have set.
 
 ## How to install
 
