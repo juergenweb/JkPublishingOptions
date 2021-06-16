@@ -11,4 +11,4 @@ This module is inspired by the SchedulePages module, but the code is completely 
 ![alt text](https://raw.githubusercontent.com/juergenweb/PublishingOptions/main/configuration.jpg)
 
 ## Template view
-![alt text](https://github.com/juergenweb/PublishingOptions/blob/master/form.jpg)
+![alt text](https://raw.githubusercontent.com/juergenweb/PublishingOptions/main/form.jpg)
