@@ -35,7 +35,7 @@ class PublishingOptions extends WireData implements Module, ConfigurableModule
       'PHP>=7.0.0',
       'ProcessWire>=3.0.0']
     ];
-    
+
   }
 
   public function __construct()
@@ -51,6 +51,7 @@ class PublishingOptions extends WireData implements Module, ConfigurableModule
     $this->addHookBefore('Pages::save', $this, 'beforePageSave');
     $this->addHookAfter('Pages::saved', $this, 'afterPageSaved');
     $this->addHookBefore('ProcessModule::executeEdit', $this, 'addFieldsToTemplate');
+    $this->addHookBefore('ProcessModule::executeEdit', $this, 'disableUninstall');
   }
 
 
@@ -60,12 +61,13 @@ class PublishingOptions extends WireData implements Module, ConfigurableModule
 
   public function runPublishingOptions()
   {
-    $templateSelector = count($this->publishingOptionsTemplates) ? 'template="'.implode('|',$this->publishingOptionsTemplates).'",' : '';
-    $unpublishedPages = wire("pages")->find("status=unpublished,'.$templateSelector.'(publish_from<=now, publish_until>=now), (publish_from<=now, publish_until='')");
-    $publishedPages = wire("pages")->find("status=published,'.$templateSelector.'(publish_from='', publish_until<=now), (publish_from>=now, publish_until<=now), (publish_from>=now, publish_until>=now)");
-    //$unpublishedPages = wire("pages")->find("status=unpublished, has_parent!=" . wire("config")->adminRootPageID . ", (publish_from<=now, publish_until>=now), (publish_from<=now, publish_until='')");
-    //$publishedPages = wire("pages")->find("status=published, has_parent!=" . wire("config")->adminRootPageID . ", (publish_from='', publish_until<=now), (publish_from>=now, publish_until<=now), (publish_from>=now, publish_until>=now)");
+
+    $templateSelector = count($this->publishingOptionsTemplates) ? 'template='.implode('|',$this->publishingOptionsTemplates).',' : '';
+    $unpublishedPages = wire("pages")->find("status=unpublished,$templateSelector(publish_from<=now, publish_until>=''),(publish_from<=now, publish_until>=now),(publish_from<='', publish_until>=now)");
+    $publishedPages = wire("pages")->find("status=published,$templateSelector(publish_from='', publish_until<=now),(publish_from>=now, publish_until>=now),(publish_from<=now, publish_until<=now),(publish_from>=now, publish_until<=now),(publish_from>=now, publish_until='')");
+
     $results = $unpublishedPages->import($publishedPages);
+    $this->session->message('cron');
 
     foreach($results as $p){
          $p->setOutputFormatting(false);
@@ -178,9 +180,19 @@ class PublishingOptions extends WireData implements Module, ConfigurableModule
   }
 
 
-/*
-  protected static function uninstallAllowed()
-  {
+
+/**
+* Enable/disable uninstall checkbox depending on whether there are publishing fields in some templates or not
+* Thanks to Robin S. from the Processwire support forum for helping me out with this hook.
+*/
+protected function disableUninstall(HookEvent $event) {
+  $moduleName = (new \ReflectionClass(get_called_class()))->getShortName(); //returns the class/module name
+	if($event->wire()->input->get('name') !== $moduleName) return;
+	$event->wire()->addHookBefore('InputfieldForm::render', function(HookEvent $event) use($moduleName) {
+		/** @var InputfieldForm $form */
+		$form = $event->object;
+		if($form->id !== 'ModuleEditForm') return;
+		$your_module = $event->wire()->modules->get($moduleName);
     $fieldsInTemplate = [];
     $moduleFields = ['publish_from', 'publish_until', 'publish_open', 'publish_open'.FieldtypeFieldsetOpen::fieldsetCloseIdentifier];
     foreach($moduleFields as $moduleField){
@@ -188,15 +200,13 @@ class PublishingOptions extends WireData implements Module, ConfigurableModule
       if($field && $field->numFieldgroups() > 0)
   			$fieldsInTemplate[] = $moduleField;
       }
-
     if(count($fieldsInTemplate)){
-
-
-      return true;
-    }
-    return false;
-  }
-*/
+			$uninstall = $form->getChildByName('uninstall');
+			$uninstall->description(__('You may not uninstall this module because some templates have publishing fields inside. Please remove these fields from the templates first. Use the checkboxes above, uncheck them at all and press the save button. Afterwards you will be able to uninstall this module.'));
+			$uninstall->attr('disabled', 'disabled');
+		}
+	});
+}
 
   /**
   * Module configuration
