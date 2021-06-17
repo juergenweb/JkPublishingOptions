@@ -6,6 +6,7 @@ This module is inspired by the SchedulePages module, but the code is completely 
 * Publish from and publish until date inputs will be surrounded by a fieldset
 * Includes more LazyCron time intervals
 * You can add/remove publishing fields from specific templates from the module configuration - no need to add/remove them manually from templates
+* Uninstall checkbox is disabled until publishing fields are removed from all templates 
 
 ## Module configuration fields
 ![alt text](https://raw.githubusercontent.com/juergenweb/PublishingOptions/main/configuration.jpg)
