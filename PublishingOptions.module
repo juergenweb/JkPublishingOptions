@@ -234,7 +234,29 @@ class PublishingOptions extends WireData implements Module, ConfigurableModule {
     public function ___getModuleConfigInputfields($inputfields) {
 
         // create array of CronJob intervals
-        $intervals = ['every30Seconds' => __('Every 30 seconds') , 'everyMinute' => __('Every minute') , 'every2Minutes' => __('Every 2 minutes') , 'every3Minutes' => __('Every 3 minutes') , 'every4Minutes' => __('Every 4 minutes') , 'every5Minutes' => __('Every 5 minutes') , 'every10Minutes' => __('Every 10 minutes') , 'every15Minutes' => __('Every 15 minutes') , 'every30Minutes' => __('Every 30 minutes') , 'every45Minutes' => __('Every 45 minutes') , 'everyHour' => __('Every hour') , 'every2Hours' => __('Every 2 hours') , 'every4Hours' => __('Every 4 hours') , 'every6Hours' => __('Every 6 hours') , 'every12Hours' => __('Every 12 hours') , 'everyDay' => __('Every day') , 'every2Days' => __('Every 2 days') , 'every4Days' => __('Every 4 days') , 'everyWeek' => __('Every week') , 'every2Weeks' => __('Every 2 weeks') , 'every4Weeks' => __('Every 4 weeks') , ];
+        $intervals = [
+          'every30Seconds' => __('Every 30 seconds') ,
+          'everyMinute' => __('Every minute') ,
+          'every2Minutes' => __('Every 2 minutes') ,
+          'every3Minutes' => __('Every 3 minutes') ,
+          'every4Minutes' => __('Every 4 minutes') ,
+          'every5Minutes' => __('Every 5 minutes') ,
+          'every10Minutes' => __('Every 10 minutes') ,
+          'every15Minutes' => __('Every 15 minutes') ,
+          'every30Minutes' => __('Every 30 minutes') ,
+          'every45Minutes' => __('Every 45 minutes') ,
+          'everyHour' => __('Every hour') ,
+          'every2Hours' => __('Every 2 hours') ,
+          'every4Hours' => __('Every 4 hours') ,
+          'every6Hours' => __('Every 6 hours') ,
+          'every12Hours' => __('Every 12 hours') ,
+          'everyDay' => __('Every day') ,
+          'every2Days' => __('Every 2 days') ,
+          'every4Days' => __('Every 4 days') ,
+          'everyWeek' => __('Every week') ,
+          'every2Weeks' => __('Every 2 weeks') ,
+          'every4Weeks' => __('Every 4 weeks')
+        ];
 
         // create select to choose the interval
         $f = $this->modules->get('InputfieldSelect');
