@@ -3,7 +3,7 @@ declare(strict_types = 1);
 namespace ProcessWire;
 
 /**
- * A module for publish/unpublish pages depending on time/date settings on per page base
+ * A module for publish/unpublish pages depending on date and time settings on per page base
  * Uses LazyCron which will be triggered on page load
  *
  * @author Jürgen Kern
@@ -67,7 +67,6 @@ class PublishingOptions extends WireData implements Module, ConfigurableModule
     $publishedPages = wire("pages")->find("status=published,$templateSelector(publish_from='', publish_until<=now),(publish_from>=now, publish_until>=now),(publish_from<=now, publish_until<=now),(publish_from>=now, publish_until<=now),(publish_from>=now, publish_until='')");
 
     $results = $unpublishedPages->import($publishedPages);
-    $this->session->message('cron');
 
     foreach($results as $p){
          $p->setOutputFormatting(false);
