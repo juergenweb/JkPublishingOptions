@@ -32,6 +32,8 @@ Entering values inside the 2 date fields is optional.
 
 So this module publishes or unpublishes a page according to the dates you have set.
 
+If you want to change the labels of the input fields or the title of the fieldset, please go to the fields configuration page and make your changes there. 
+
 ## How to install
 
 1. Download and place the module folder named "PublishingOptions" in:
