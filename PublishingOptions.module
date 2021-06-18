@@ -18,14 +18,14 @@ namespace ProcessWire;
 class PublishingOptions extends WireData implements Module, ConfigurableModule
 {
 
-  protected $publishingOptionsTemplates = [];
+  protected $publishingOptionsTemplates = []; // numeric array the holds the name of the templates which include the publishing fields
 
   public static function getModuleInfo()
   {
 
     return [
       'title' => __('Publish/Unpublish pages'),
-      'summary' => __('Publish and unpublish pages depending on dates using LazyCron.'),
+      'summary' => __('Publish and unpublish pages depending on dates and times using LazyCron.'),
       'author' => "Jürgen Kern",
       'href' => 'https://github.com/juergenweb/PublishingOptions',
       'version' => 1,
@@ -40,6 +40,7 @@ class PublishingOptions extends WireData implements Module, ConfigurableModule
 
   public function __construct()
   {
+    //if some template checkboxes are checked add them to the array
     if(wire('modules')->getConfig($this, 'input_templates') != null)
       $this->publishingOptionsTemplates = wire('modules')->getConfig($this, 'input_templates');// set templates including publishing fields from config
   }
@@ -50,21 +51,54 @@ class PublishingOptions extends WireData implements Module, ConfigurableModule
     $this->addHookAfter('InputfieldDatetime::processInput', $this, 'validateDates');
     $this->addHookBefore('Pages::save', $this, 'beforePageSave');
     $this->addHookAfter('Pages::saved', $this, 'afterPageSaved');
-    $this->addHookBefore('ProcessModule::executeEdit', $this, 'addFieldsToTemplate');
     $this->addHookBefore('ProcessModule::executeEdit', $this, 'disableUninstall');
+    $this->addHookBefore('ProcessModule::executeEdit', $this, 'addRemovePublishingFields');
   }
+
+  /**
+  * Method to validate if publish_until is after publish_from, otherwise show an error at the publish_until field
+  * @param HookEvent $event
+  */
+
+  protected function validateDates(HookEvent $event)
+  {
+    $field = $event->object;
+
+    if($field->name == 'publish_from' || $field->name == 'publish_until') {
+      $from = '';// publish_from date
+      $until = '';// publish_until date
+      $session = $this->wire('session');
+
+      if($field->name == 'publish_from') {
+        $from = $field->value;
+        $session->set('from', $from);
+      } elseif($field->name == 'publish_until') {
+        $until = $field->value;
+        $from = $session->get('from');
+        // compare publish_from and publish_until date
+        if(($from && $until) && ($from >= $until)) {
+          $field->error(__('Publish until date must be after publish from date.'));
+        }
+        // delete the temporary session
+        $session->remove('from');
+      }
+    }
+  }
+
 
 
   /**
   * Publish or unpublish pages including publishing fields depending on page settings
+  * Search for pages with status published or unpublished, no pages in trash, no pages under the admin, template has publishing fields inside and the date and time settings are out of time - so status should be changed
+  * Aim is to only find pages where the status should be changed (published or unpublished) - as few repetitions as possible in the foreach loop
   */
 
-  public function runPublishingOptions()
+  protected function runPublishingOptions()
   {
 
     $templateSelector = count($this->publishingOptionsTemplates) ? 'template='.implode('|',$this->publishingOptionsTemplates).',' : '';
-    $unpublishedPages = wire("pages")->find("status=unpublished,$templateSelector(publish_from<=now, publish_until>=''),(publish_from<=now, publish_until>=now),(publish_from<='', publish_until>=now)");
-    $publishedPages = wire("pages")->find("status=published,$templateSelector(publish_from='', publish_until<=now),(publish_from>=now, publish_until>=now),(publish_from<=now, publish_until<=now),(publish_from>=now, publish_until<=now),(publish_from>=now, publish_until='')");
+    $unpublishedPages = wire("pages")->find("status=unpublished,has_parent!=" . wire("config")->adminRootPageID.",has_parent!=" . wire("config")->trashPageID.",$templateSelector(publish_from<=now, publish_until>=''),(publish_from<=now, publish_until>=now)");
+    $publishedPages = wire("pages")->find("status=published,has_parent!=" . wire("config")->adminRootPageID.",has_parent!=" . wire("config")->trashPageID.",$templateSelector(publish_from>=now, publish_until>=now),(publish_from>=now, publish_until<=now),(publish_from>=now, publish_until=''),(publish_from<=now, publish_until<=now)");
 
     $results = $unpublishedPages->import($publishedPages);
 
@@ -80,51 +114,24 @@ class PublishingOptions extends WireData implements Module, ConfigurableModule
   }
 
 
-  /**
-  * Method to validate if publish_until is after publish_from, otherwise show an error at the publish_until field
-  * @param HookEvent $event
-  */
-
-  protected function validateDates(HookEvent $event)
-  {
-    $field = $event->object;
-
-    if($field->name == 'publish_from' || $field->name == 'publish_until') {
-      $from = '';// publish_from date
-		  $until = '';// publish_until date
-		  $session = $this->wire('session');
-
-      if($field->name == 'publish_from') {
-  			$from = $field->value;
-  			$session->set('from', $from);
-		  } elseif($field->name == 'publish_until') {
-			  $until = $field->value;
-			  $from = $session->get('from');
-  			// compare publish_from and publish_until date
-  			if(($from && $until) && ($from >= $until)) {
-          $field->error(__('Publish until date must be after publish from date.'));
-        }
-  			// delete the temporary session
-  			$session->remove('from');
-		  }
-    }
-  }
 
 
   /**
   * Method runs before page is saved
-  * Set page status to unpublished during the save process if publish_from is in the future or publish_until is in the past
-  * @param HookEvent $event
+  * This method runs on manually page save
+  * Set page status to unpublished or remove unpublished status depending if date range is out of date or not
   */
 
   protected function beforePageSave(HookEvent $event)
   {
     $page = $event->arguments(0);
+
     if(($page->publish_from) && ($page->publish_from > time()) || ($page->publish_until) && ($page->publish_until < time())){
       $page->addStatus(Page::statusUnpublished);
       $page->publish_from = NULL;
     } else {
       if(!$page->publish_from){
+        // do not remove unpublished status automatically, but set current time as publish from dateTime
         $page->publish_from = time();
       }
     }
@@ -137,19 +144,31 @@ class PublishingOptions extends WireData implements Module, ConfigurableModule
   * @param HookEvent $event
   */
 
-  public function afterPageSaved(HookEvent $event)
+  protected function afterPageSaved(HookEvent $event)
   {
     $page = $event->arguments(0);
-    if($page->is(Page::statusUnpublished))
+     if($page->is(Page::statusUnpublished)){
+       $page->publish_from = NULL;
+       $page->save('publish_from');
+     }
+
+
+    /*
+    // if page is unpublished set publish_from to null
+    if($page->isUnpublished()){
       $page->publish_from = NULL;
+      $page->save('publish_from');
+    }*/
+
   }
 
 
   /**
-  * Add or remove publishing fields from templates after saving the module config
+  * Add or remove publishing fields from templates after saving the module config page
+  * If a template is not checked in the modul config, then all publishing fields will be removed from it, otherwise they will be added to the template
   */
 
-  protected function addFieldsToTemplate()
+  protected function addRemovePublishingFields()
   {
     $publish_from = wire('fields')->get('publish_from');
     $publish_until = wire('fields')->get('publish_until');
@@ -172,7 +191,6 @@ class PublishingOptions extends WireData implements Module, ConfigurableModule
           $currentTempl->fieldgroup->remove('publish_until');
           $currentTempl->fieldgroup->remove('publish_open'.FieldtypeFieldsetOpen::fieldsetCloseIdentifier);
         }
-
         $currentTempl->fieldgroup->save();
       }
 
@@ -183,6 +201,8 @@ class PublishingOptions extends WireData implements Module, ConfigurableModule
 /**
 * Enable/disable uninstall checkbox depending on whether there are publishing fields in some templates or not
 * Thanks to Robin S. from the Processwire support forum for helping me out with this hook.
+* This method should prevent uninstallation if there are publishing fields left in some templates, but there is also a WireException that prevents the uninstalling too
+* This method is much more user friendly than showing an exception
 */
 protected function disableUninstall(HookEvent $event) {
   $moduleName = (new \ReflectionClass(get_called_class()))->getShortName(); //returns the class/module name
@@ -208,7 +228,7 @@ protected function disableUninstall(HookEvent $event) {
 }
 
   /**
-  * Module configuration
+  * Module configuration fields
   */
 
   /**
@@ -234,7 +254,7 @@ protected function disableUninstall(HookEvent $event) {
   public function ___getModuleConfigInputfields($inputfields)
   {
 
-    // create array of intervals
+    // create array of CronJob intervals
     $intervals = [
   		'every30Seconds' => __('Every 30 seconds'),
   		'everyMinute' => __('Every minute'),
@@ -347,6 +367,7 @@ protected function disableUninstall(HookEvent $event) {
     foreach($moduleFields as $moduleField){
       $field = wire('fields')->get($moduleField);
       if($field && $field->numFieldgroups() > 0)
+        // this prevents uninstallation of the module if there are publishing fields in some templates left
   			throw new WireException(sprintf(__("Cannot uninstall because the field %s is still being used. Please remove the fields %s from any templates."), $moduleField, implode(', ', $moduleFields)));
       if($field)
         wire('fields')->delete($field);
