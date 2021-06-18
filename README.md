@@ -17,6 +17,10 @@ If the checkbox of a certain template is checked, then the publishing fields wil
 On the opposite, the publishing fields will be removed from all templates where the checkbox is unchecked.
 So there is no longer the need to add or remove the publishing fields manually to each template.
 
+As mentioned above the uninstall textbox will be disabled if one or more templates contain publishing fields.
+![alt text](https://raw.githubusercontent.com/juergenweb/PublishingOptions/main/disabled.jpg)
+
+
 ## Template view
 ![alt text](https://raw.githubusercontent.com/juergenweb/PublishingOptions/main/form.jpg)
 
