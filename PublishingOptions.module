@@ -223,8 +223,6 @@ class PublishingOptions extends WireData implements Module, ConfigurableModule {
     {
         $templates = [];
         foreach (wire('templates')->find('flags!="8"') as $template) {
-            $value = 0;
-            if (($template->hasField('publish_from')) && ($template->hasField('publish_until'))) $value = 1;
             $templates[] = $template->name;
         }
         return $templates;
