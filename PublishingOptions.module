@@ -40,15 +40,15 @@ class PublishingOptions extends WireData implements Module, ConfigurableModule {
     public static function getModuleInfo() {
 
         return [
-          'title' => 'Publish/Unpublish pages' , 
+          'title' => 'Publish/Unpublish pages',
           'summary' => 'Publish and unpublish pages depending on dates and times using LazyCron.',
           'author' => 'Jürgen Kern',
           'href' => 'https://github.com/juergenweb/PublishingOptions',
           'version' => '1.2.0',
           'singular' => true,
           'autoload' => true,
-          'requires' => ['
-            LazyCron',
+          'requires' => [
+            'LazyCron',
             'PHP>=7.2.0',
             'ProcessWire>=3.0.0'
             ]
