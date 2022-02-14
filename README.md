@@ -1,12 +1,13 @@
 # JKPublishingOptions
 ProcessWire module to publish and unpublish pages depending on dates
-(Status is Beta - so should be tested carefully!!)
 
 This module is inspired by the SchedulePages module, but the code is completely rewritten. However, it differs from the other module in a few ways.
 * Publish from and publish until date inputs will be surrounded by a fieldset
 * Includes more LazyCron time intervals
 * You can add/remove publishing fields from specific templates from the module configuration - no need to add/remove them manually from templates
-* Uninstall checkbox is disabled until publishing fields are removed from all templates 
+* Uninstall checkbox is disabled until publishing fields are removed from all templates
+
+This module creates 2 new Datetime Inputfields and a new Fieldset for holding the inputs.
 
 ## Module configuration fields
 ![alt text](https://raw.githubusercontent.com/juergenweb/JKPublishingOptions/main/configuration.jpg)
@@ -37,7 +38,7 @@ Entering values inside the 2 date fields is optional.
 
 So this module publishes or unpublishes a page according to the dates you have set.
 
-If you want to change the labels of the input fields or the title of the fieldset, please go to the fields configuration page and make your changes there. 
+If you want to change the labels of the input fields or the title of the fieldset, please go to the fields configuration page and make your changes there.
 
 ## How to install
 
@@ -56,9 +57,9 @@ screen, click the "Check for New Modules" button.
 1. Go to the module configuration
 
 2. Uncheck all checkboxes to remove the publishing fields from all templates
- 
+
 3. Click the save button
-  
+
 4. Now lets check the uninstall checkbox in the module configuration and click the save button once more
 
 5. All fields will be deleted and the module will be uninstalled
