@@ -1,16 +1,6 @@
 <?php
 declare(strict_types = 1);
-namespace JkPublishingOptions;
-
-use \ProcessWire\WireData as WireData;
-use \ProcessWire\Module as Module;
-use \ProcessWire\ConfigurableModule as ConfigurableModule;
-use \ProcessWire\HookEvent as HookEvent;
-use \ProcessWire\FieldtypeFieldsetOpen as FieldtypeFieldsetOpen;
-
-use function \ProcessWire\wire;
-use function \ProcessWire\___getModuleConfigInputfields;
-
+namespace ProcessWire;
 
 /**
   * A module for publish/unpublish pages depending on date and time settings on per page base
