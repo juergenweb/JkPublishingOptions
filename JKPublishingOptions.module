@@ -88,16 +88,16 @@ class JkPublishingOptions extends WireData implements Module, ConfigurableModule
     protected function validateDates(HookEvent $event) {
         $field = $event->object;
 
-        if ($field->name == 'publish_from' || $field->name == 'publish_until') {
+        if ($field->name == 'jk_publish_from' || $field->name == 'jk_publish_until') {
             $from = ''; // publish_from date
             $until = ''; // publish_until date
             $session = $this->wire('session');
 
-            if ($field->name == 'publish_from') {
+            if ($field->name == 'jk_publish_from') {
                 $from = $field->value;
                 $session->set('from', $from);
             }
-            elseif ($field->name == 'publish_until') {
+            elseif ($field->name == 'jk_publish_until') {
                 $until = $field->value;
                 $from = $session->get('from');
                 // compare publish_from and publish_until date
@@ -119,8 +119,8 @@ class JkPublishingOptions extends WireData implements Module, ConfigurableModule
     protected function runJkPublishingOptions() {
 
         $templateSelector = count($this->JkpublishingOptionsTemplates) ? 'template=' . implode('|', $this->JkpublishingOptionsTemplates) . ',' : '';
-        $unpublishedPages = wire("pages")->find("status=unpublished,has_parent!=" . wire("config")->adminRootPageID . ",has_parent!=" . wire("config")->trashPageID . ",$templateSelector(publish_from<=now, publish_until>=''),(publish_from<=now, publish_until>=now)");
-        $publishedPages = wire("pages")->find("status=published,has_parent!=" . wire("config")->adminRootPageID . ",has_parent!=" . wire("config")->trashPageID . ",$templateSelector(publish_from>=now, publish_until>=now),(publish_from>=now, publish_until<=now),(publish_from>=now, publish_until=''),(publish_from<=now, publish_until<=now)");
+        $unpublishedPages = wire("pages")->find("status=unpublished,has_parent!=" . wire("config")->adminRootPageID . ",has_parent!=" . wire("config")->trashPageID . ",$templateSelector(jk_publish_from<=now, jk_publish_until>=''),(jk_publish_from<=now, jk_publish_until>=now)");
+        $publishedPages = wire("pages")->find("status=published,has_parent!=" . wire("config")->adminRootPageID . ",has_parent!=" . wire("config")->trashPageID . ",$templateSelector(jk_publish_from>=now, jk_publish_until>=now),(jk_publish_from>=now, jk_publish_until<=now),(jk_publish_from>=now, jk_publish_until=''),(jk_publish_from<=now, jk_publish_until<=now)");
 
         $results = $unpublishedPages->import($publishedPages);
 
@@ -145,14 +145,14 @@ class JkPublishingOptions extends WireData implements Module, ConfigurableModule
     protected function beforePageSave(HookEvent $event) {
         $page = $event->arguments(0);
 
-        if (($page->publish_from) && ($page->publish_from > time()) || ($page->publish_until) && ($page->publish_until < time())) {
+        if (($page->jk_publish_from) && ($page->jk_publish_from > time()) || ($page->jk_publish_until) && ($page->jk_publish_until < time())) {
             $page->addStatus(Page::statusUnpublished);
-            $page->publish_from = NULL;
+            $page->jk_publish_from = NULL;
         }
         else {
-            if (!$page->publish_from) {
+            if (!$page->jk_publish_from) {
                 // do not remove unpublished status automatically, but set current time as publish from dateTime
-                $page->publish_from = time();
+                $page->jk_publish_from = time();
             }
         }
     }
@@ -166,8 +166,8 @@ class JkPublishingOptions extends WireData implements Module, ConfigurableModule
     protected function afterPageSaved(HookEvent $event) {
         $page = $event->arguments(0);
         if ($page->is(Page::statusUnpublished)) {
-            $page->publish_from = NULL;
-            $page->save('publish_from');
+            $page->jk_publish_from = NULL;
+            $page->save('jk_publish_from');
         }
     }
 
@@ -177,27 +177,27 @@ class JkPublishingOptions extends WireData implements Module, ConfigurableModule
      */
 
     protected function addRemovePublishingFields() {
-        $publish_from = wire('fields')->get('publish_from');
-        $publish_until = wire('fields')->get('publish_until');
-        $publish_open = wire('fields')->get('publish_open');
-        $publish_close = wire('fields')->get('publish_open' . FieldtypeFieldsetOpen::fieldsetCloseIdentifier);
+        $jk_publish_from = wire('fields')->get('jk_publish_from');
+        $jk_publish_until = wire('fields')->get('jk_publish_until');
+        $jk_publish_open = wire('fields')->get('jk_publish_open');
+        $jk_publish_close = wire('fields')->get('jk_publish_open' . FieldtypeFieldsetOpen::fieldsetCloseIdentifier);
 
         foreach ($this->getTemplates() as $template) {
             $currentTempl = wire('templates')->get($template);
             if (in_array($template, $this->JkpublishingOptionsTemplates)) {
-                if (!$currentTempl->hasField('publish_from')) {
+                if (!$currentTempl->hasField('jk_publish_from')) {
                     //not present so add this 2 fields to the template
-                    $currentTempl->fieldgroup->add($publish_open);
-                    $currentTempl->fieldgroup->add($publish_from);
-                    $currentTempl->fieldgroup->add($publish_until);
-                    $currentTempl->fieldgroup->add($publish_close);
+                    $currentTempl->fieldgroup->add($jk_publish_open);
+                    $currentTempl->fieldgroup->add($jk_publish_from);
+                    $currentTempl->fieldgroup->add($jk_publish_until);
+                    $currentTempl->fieldgroup->add($jk_publish_close);
                 }
             }
             else {
-                $currentTempl->fieldgroup->remove('publish_open');
-                $currentTempl->fieldgroup->remove('publish_from');
-                $currentTempl->fieldgroup->remove('publish_until');
-                $currentTempl->fieldgroup->remove('publish_open' . FieldtypeFieldsetOpen::fieldsetCloseIdentifier);
+                $currentTempl->fieldgroup->remove('jk_publish_open');
+                $currentTempl->fieldgroup->remove('jk_publish_from');
+                $currentTempl->fieldgroup->remove('jk_publish_until');
+                $currentTempl->fieldgroup->remove('jk_publish_open' . FieldtypeFieldsetOpen::fieldsetCloseIdentifier);
             }
             $currentTempl->fieldgroup->save();
         }
@@ -219,7 +219,7 @@ class JkPublishingOptions extends WireData implements Module, ConfigurableModule
             if ($form->id !== 'ModuleEditForm') return;
             $your_module = $event->wire()->modules->get($moduleName);
             $fieldsInTemplate = [];
-            $moduleFields = ['publish_from', 'publish_until', 'publish_open', 'publish_open' . FieldtypeFieldsetOpen::fieldsetCloseIdentifier];
+            $moduleFields = ['jk_publish_from', 'jk_publish_until', 'jk_publish_open', 'jk_publish_open' . FieldtypeFieldsetOpen::fieldsetCloseIdentifier];
             foreach ($moduleFields as $moduleField) {
                 $field = wire('fields')->get($moduleField);
                 if ($field && $field->numFieldgroups() > 0) $fieldsInTemplate[] = $moduleField;
@@ -310,10 +310,10 @@ class JkPublishingOptions extends WireData implements Module, ConfigurableModule
 
     public function ___install() {
         // Add the required fields for this module
-        if (!wire('fields')->get('publish_from')) {
+        if (!wire('fields')->get('jk_publish_from')) {
             $field = new Field();
             $field->type = $this->modules->get("FieldtypeDatetime");
-            $field->name = 'publish_from';
+            $field->name = 'jk_publish_from';
             $field->label = $this->_('Publish From Date');
             $field->dateOutputFormat = 'd-m-Y H:i:s';
             $field->dateInputFormat = 'd-M-Y';
@@ -325,10 +325,10 @@ class JkPublishingOptions extends WireData implements Module, ConfigurableModule
             $field->save();
         }
 
-        if (!wire('fields')->get('publish_until')) {
+        if (!wire('fields')->get('jk_publish_until')) {
             $field = new Field();
             $field->type = $this->modules->get("FieldtypeDatetime");
-            $field->name = 'publish_until';
+            $field->name = 'jk_publish_until';
             $field->label = $this->_('Publish Until Date');
             $field->dateOutputFormat = 'd-m-Y H:i:s';
             $field->dateInputFormat = 'd-M-Y';
@@ -341,16 +341,16 @@ class JkPublishingOptions extends WireData implements Module, ConfigurableModule
         }
 
         // create fieldset
-        if (!wire('fields')->get('publish_open')) {
+        if (!wire('fields')->get('jk_publish_open')) {
             $opener = new Field();
             $opener->type = new FieldtypeFieldsetOpen();
-            $opener->name = "publish_open";
+            $opener->name = "jk_publish_open";
             $opener->label = $this->_('Publishing options');
             $opener->save();
 
             $closer = new Field();
             $closer->type = new FieldtypeFieldsetClose();
-            $closer->name = "publish_open" . FieldtypeFieldsetOpen::fieldsetCloseIdentifier;
+            $closer->name = "jk_publish_open" . FieldtypeFieldsetOpen::fieldsetCloseIdentifier;
             $closer->save();
         }
 
@@ -358,7 +358,7 @@ class JkPublishingOptions extends WireData implements Module, ConfigurableModule
 
     public function ___uninstall() {
         // Remove the module's fields if the module is uninstalled
-        $moduleFields = ['publish_from', 'publish_until', 'publish_open', 'publish_open' . FieldtypeFieldsetOpen::fieldsetCloseIdentifier];
+        $moduleFields = ['jk_publish_from', 'jk_publish_until', 'jk_publish_open', 'jk_publish_open' . FieldtypeFieldsetOpen::fieldsetCloseIdentifier];
         foreach ($moduleFields as $moduleField) {
             $field = wire('fields')->get($moduleField);
             if ($field && $field->numFieldgroups() > 0)
