@@ -12,7 +12,7 @@ namespace ProcessWire;
   * - __construct()
   * - init()
   * - validateDates()
-  * - runPublishingOptions()
+  * - runJKPublishingOptions()
   * - beforePageSave()
   * - afterPageSaved()
   * - addRemovePublishingFields()
@@ -22,7 +22,7 @@ namespace ProcessWire;
   * - ___install()
   * - ___uninstall()
   * Classes list:
-  * - PublishingOptions extends WireData
+  * - JKPublishingOptions extends WireData
   *
   * @author Jürgen Kern
   *
@@ -33,9 +33,9 @@ namespace ProcessWire;
   *
  */
 
-class PublishingOptions extends WireData implements Module, ConfigurableModule {
+class JKPublishingOptions extends WireData implements Module, ConfigurableModule {
 
-    protected $publishingOptionsTemplates = []; // numeric array the holds the name of the templates which include the publishing fields
+    protected $JKpublishingOptionsTemplates = []; // numeric array the holds the name of the templates which include the publishing fields
 
     public static function getModuleInfo() {
 
@@ -43,7 +43,7 @@ class PublishingOptions extends WireData implements Module, ConfigurableModule {
           'title' => 'Publish/Unpublish pages',
           'summary' => 'Publish and unpublish pages depending on dates and times using LazyCron.',
           'author' => 'Jürgen Kern',
-          'href' => 'https://github.com/juergenweb/PublishingOptions',
+          'href' => 'https://github.com/juergenweb/JKPublishingOptions',
           'version' => '1.2.0',
           'singular' => true,
           'autoload' => true,
@@ -58,12 +58,12 @@ class PublishingOptions extends WireData implements Module, ConfigurableModule {
 
     public function __construct() {
         //if some template checkboxes are checked add them to the array
-        if (wire('modules')->getConfig($this, 'input_templates') != null) $this->publishingOptionsTemplates = wire('modules')->getConfig($this, 'input_templates'); // set templates including publishing fields from config
+        if (wire('modules')->getConfig($this, 'input_templates') != null) $this->JKpublishingOptionsTemplates = wire('modules')->getConfig($this, 'input_templates'); // set templates including publishing fields from config
 
     }
 
     public function init() {
-        $this->addHook("LazyCron::{$this->input_croninterval}", $this, 'runPublishingOptions');
+        $this->addHook("LazyCron::{$this->input_croninterval}", $this, 'runPJKublishingOptions');
         $this->addHookAfter('InputfieldDatetime::processInput', $this, 'validateDates');
         $this->addHookBefore('Pages::save', $this, 'beforePageSave');
         $this->addHookAfter('Pages::saved', $this, 'afterPageSaved');
@@ -107,7 +107,7 @@ class PublishingOptions extends WireData implements Module, ConfigurableModule {
      * Aim is to only find pages where the status should be changed (published or unpublished) - as few repetitions as possible in the foreach loop
      */
 
-    protected function runPublishingOptions() {
+    protected function runJKPublishingOptions() {
 
         $templateSelector = count($this->publishingOptionsTemplates) ? 'template=' . implode('|', $this->publishingOptionsTemplates) . ',' : '';
         $unpublishedPages = wire("pages")->find("status=unpublished,has_parent!=" . wire("config")->adminRootPageID . ",has_parent!=" . wire("config")->trashPageID . ",$templateSelector(publish_from<=now, publish_until>=''),(publish_from<=now, publish_until>=now)");
