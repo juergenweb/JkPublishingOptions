@@ -363,7 +363,7 @@ class JkPublishingOptions extends WireData implements Module, ConfigurableModule
             $field = wire('fields')->get($moduleField);
             if ($field && $field->numFieldgroups() > 0)
             // this prevents uninstallation of the module if there are publishing fields in some templates left
-            throw new WireException(sprintf(__("Cannot uninstall because the field %s is still being used. Please remove the fields %s from any templates.") , $moduleField, implode(', ', $moduleFields)));
+            throw new WireException(sprintf($this->_("Cannot uninstall because the field %s is still being used. Please remove the fields %s from any templates.") , $moduleField, implode(', ', $moduleFields)));
             if ($field) wire('fields')->delete($field);
         }
     }
