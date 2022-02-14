@@ -1,4 +1,4 @@
-# PublishingOptions
+# JKPublishingOptions
 ProcessWire module to publish and unpublish pages depending on dates
 (Status is Beta - so should be tested carefully!!)
 
@@ -9,7 +9,7 @@ This module is inspired by the SchedulePages module, but the code is completely 
 * Uninstall checkbox is disabled until publishing fields are removed from all templates 
 
 ## Module configuration fields
-![alt text](https://raw.githubusercontent.com/juergenweb/PublishingOptions/main/configuration.jpg)
+![alt text](https://raw.githubusercontent.com/juergenweb/JKPublishingOptions/main/configuration.jpg)
 
 As you can see, you have a select input with all LazyCron time intervals - default is 1 hour.
 Afterwards is a list of checkboxes. Each checkbox represents a frontend template where you can add the publishing fields.
@@ -19,11 +19,11 @@ So there is no longer the need to add or remove the publishing fields manually t
 
 As mentioned above the uninstall checkbox will be disabled if one or more templates contain publishing fields.
 
-![alt text](https://raw.githubusercontent.com/juergenweb/PublishingOptions/main/disabled.jpg)
+![alt text](https://raw.githubusercontent.com/juergenweb/JKPublishingOptions/main/disabled.jpg)
 
 
 ## Template view
-![alt text](https://raw.githubusercontent.com/juergenweb/PublishingOptions/main/form.jpg)
+![alt text](https://raw.githubusercontent.com/juergenweb/JKPublishingOptions/main/form.jpg)
 
 As you can see the inputs are side by side inside a fieldset.
 
@@ -41,7 +41,7 @@ If you want to change the labels of the input fields or the title of the fieldse
 
 ## How to install
 
-1. Download and place the module folder named "PublishingOptions" in:
+1. Download and place the module folder named "JKPublishingOptions" in:
 /site/modules/
 
 2. In the admin control panel, go to Modules. At the bottom of the
