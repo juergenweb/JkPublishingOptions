@@ -18,6 +18,7 @@ namespace ProcessWire;
   * - addRemovePublishingFields()
   * - disableUninstall()
   * - getTemplates()
+  * - sortModuleFields()
   * - ___getModuleConfigInputfields()
   * - ___install()
   * - ___uninstall()
@@ -36,6 +37,8 @@ namespace ProcessWire;
 class JkPublishingOptions extends WireData implements Module, ConfigurableModule {
 
     protected $JkpublishingOptionsTemplates = []; // numeric array the holds the name of the templates which include the publishing fields
+    protected $jkFields = ['jk_publish_from', 'jk_publish_until', 'jk_publish_open']; // array of the fields that were created by this module
+    protected $moduleFields = [];
 
     public static function getModuleInfo() {
 
@@ -57,47 +60,63 @@ class JkPublishingOptions extends WireData implements Module, ConfigurableModule
     }
 
     public function __construct() {
-        //if some template checkboxes are checked add them to the array
-        if (wire('modules')->getConfig($this, 'input_templates') != null) $this->JkpublishingOptionsTemplates = wire('modules')->getConfig($this, 'input_templates'); // set templates including publishing fields from config
+      //if some template checkboxes are checked add them to the array
+      if (wire('modules')->getConfig($this, 'input_templates') != null)
+        $this->JkpublishingOptionsTemplates = wire('modules')->getConfig($this, 'input_templates'); // set templates including publishing fields from config
+      //create sorted module fields array for the field that were created by this module
+      $this->sortModuleFields();
+    }
+
+    /**
+    * Helper method to sort the moduleFields array
+    * Adds the fieldset start on first and fieldset end on the last position inside the array
+    */
+    private function sortModuleFields(){
+      $moduleFields = array_merge($this->jkFields, [$this->jkFields[array_key_last($this->jkFields)] . FieldtypeFieldsetOpen::fieldsetCloseIdentifier]); // add the closing fieldset field to the array
+      // add fieldset fields at top and bottom
+      $new_value = $moduleFields[2];
+      unset($moduleFields[2]);
+      array_unshift($moduleFields, $new_value);
+      $this->moduleFields = $moduleFields;
     }
 
     public function init() {
-        $this->addHook("LazyCron::{$this->input_croninterval}", $this, 'runJkPublishingOptions');
-        $this->addHookAfter('InputfieldDatetime::processInput', $this, 'validateDates');
-        $this->addHookBefore('Pages::save', $this, 'beforePageSave');
-        $this->addHookAfter('Pages::saved', $this, 'afterPageSaved');
-        $this->addHookBefore('ProcessModule::executeEdit', $this, 'disableUninstall');
-        $this->addHookBefore('ProcessModule::executeEdit', $this, 'addRemovePublishingFields');
+      $this->addHook("LazyCron::{$this->input_croninterval}", $this, 'runJkPublishingOptions');
+      $this->addHookAfter('InputfieldDatetime::processInput', $this, 'validateDates');
+      $this->addHookBefore('Pages::save', $this, 'beforePageSave');
+      $this->addHookAfter('Pages::saved', $this, 'afterPageSaved');
+      $this->addHookBefore('ProcessModule::executeEdit', $this, 'disableUninstall');
+      $this->addHookBefore('ProcessModule::executeEdit', $this, 'addRemovePublishingFields');
+      $this->addHookAfter('ProcessLanguage::processCSV', $this, 'addTranslationsToFields');
     }
 
     /**
      * Method to validate if publish_until is after publish_from, otherwise show an error at the publish_until field
      * @param HookEvent $event
      */
-
     protected function validateDates(HookEvent $event) {
-        $field = $event->object;
+      $field = $event->object;
 
-        if ($field->name == 'jk_publish_from' || $field->name == 'jk_publish_until') {
-            $from = ''; // publish_from date
-            $until = ''; // publish_until date
-            $session = $this->wire('session');
+      if ($field->name == 'jk_publish_from' || $field->name == 'jk_publish_until') {
+        $from = ''; // publish_from date
+        $until = ''; // publish_until date
+        $session = $this->wire('session');
 
-            if ($field->name == 'jk_publish_from') {
-                $from = $field->value;
-                $session->set('from', $from);
-            }
-            elseif ($field->name == 'jk_publish_until') {
-                $until = $field->value;
-                $from = $session->get('from');
-                // compare publish_from and publish_until date
-                if (($from && $until) && ($from >= $until)) {
-                    $field->error($this->_('Publish until date must be after publish from date.'));
-                }
-                // delete the temporary session
-                $session->remove('from');
-            }
+        if ($field->name == 'jk_publish_from') {
+          $from = $field->value;
+          $session->set('from', $from);
         }
+        elseif ($field->name == 'jk_publish_until') {
+          $until = $field->value;
+          $from = $session->get('from');
+          // compare publish_from and publish_until date
+          if (($from && $until) && ($from >= $until)) {
+            $field->error($this->_('Publish until date must be after publish from date.'));
+          }
+          // delete the temporary session
+          $session->remove('from');
+        }
+      }
     }
 
     /**
@@ -105,25 +124,24 @@ class JkPublishingOptions extends WireData implements Module, ConfigurableModule
      * Search for pages with status published or unpublished, no pages in trash, no pages under the admin, template has publishing fields inside and the date and time settings are out of time - so status should be changed
      * Aim is to only find pages where the status should be changed (published or unpublished) - as few repetitions as possible in the foreach loop
      */
-
     protected function runJkPublishingOptions() {
 
-        $templateSelector = count($this->JkpublishingOptionsTemplates) ? 'template=' . implode('|', $this->JkpublishingOptionsTemplates) . ',' : '';
-        $unpublishedPages = wire("pages")->find("status=unpublished,has_parent!=" . wire("config")->adminRootPageID . ",has_parent!=" . wire("config")->trashPageID . ",$templateSelector(jk_publish_from<=now, jk_publish_until>=''),(jk_publish_from<=now, jk_publish_until>=now)");
-        $publishedPages = wire("pages")->find("status=published,has_parent!=" . wire("config")->adminRootPageID . ",has_parent!=" . wire("config")->trashPageID . ",$templateSelector(jk_publish_from>=now, jk_publish_until>=now),(jk_publish_from>=now, jk_publish_until<=now),(jk_publish_from>=now, jk_publish_until=''),(jk_publish_from<=now, jk_publish_until<=now)");
+      $templateSelector = count($this->JkpublishingOptionsTemplates) ? 'template=' . implode('|', $this->JkpublishingOptionsTemplates) . ',' : '';
+      $unpublishedPages = wire("pages")->find("status=unpublished,has_parent!=" . wire("config")->adminRootPageID . ",has_parent!=" . wire("config")->trashPageID . ",$templateSelector(jk_publish_from<=now, jk_publish_until>=''),(jk_publish_from<=now, jk_publish_until>=now)");
+      $publishedPages = wire("pages")->find("status=published,has_parent!=" . wire("config")->adminRootPageID . ",has_parent!=" . wire("config")->trashPageID . ",$templateSelector(jk_publish_from>=now, jk_publish_until>=now),(jk_publish_from>=now, jk_publish_until<=now),(jk_publish_from>=now, jk_publish_until=''),(jk_publish_from<=now, jk_publish_until<=now)");
 
-        $results = $unpublishedPages->import($publishedPages);
+      $results = $unpublishedPages->import($publishedPages);
 
-        foreach ($results as $p) {
-            $p->setOutputFormatting(false);
-            if ($p->isUnpublished()) {
-                $p->removeStatus(Page::statusUnpublished);
-            }
-            else {
-                $p->addStatus(Page::statusUnpublished);
-            }
-            $p->save();
+      foreach ($results as $p) {
+        $p->setOutputFormatting(false);
+        if ($p->isUnpublished()) {
+            $p->removeStatus(Page::statusUnpublished);
         }
+        else {
+            $p->addStatus(Page::statusUnpublished);
+        }
+        $p->save();
+      }
     }
 
     /**
@@ -131,20 +149,19 @@ class JkPublishingOptions extends WireData implements Module, ConfigurableModule
      * This method runs on manually page save
      * Set page status to unpublished or remove unpublished status depending if date range is out of date or not
      */
-
     protected function beforePageSave(HookEvent $event) {
-        $page = $event->arguments(0);
+      $page = $event->arguments(0);
 
-        if (($page->jk_publish_from) && ($page->jk_publish_from > time()) || ($page->jk_publish_until) && ($page->jk_publish_until < time())) {
-            $page->addStatus(Page::statusUnpublished);
-            $page->jk_publish_from = NULL;
+      if (($page->jk_publish_from) && ($page->jk_publish_from > time()) || ($page->jk_publish_until) && ($page->jk_publish_until < time())) {
+        $page->addStatus(Page::statusUnpublished);
+        $page->jk_publish_from = NULL;
+      }
+      else {
+        if (!$page->jk_publish_from) {
+            // do not remove unpublished status automatically, but set current time as publish from dateTime
+            $page->jk_publish_from = time();
         }
-        else {
-            if (!$page->jk_publish_from) {
-                // do not remove unpublished status automatically, but set current time as publish from dateTime
-                $page->jk_publish_from = time();
-            }
-        }
+      }
     }
 
     /**
@@ -152,46 +169,58 @@ class JkPublishingOptions extends WireData implements Module, ConfigurableModule
      * Set value of publish_from field to null if page has status unpublished
      * @param HookEvent $event
      */
-
     protected function afterPageSaved(HookEvent $event) {
-        $page = $event->arguments(0);
-        if ($page->is(Page::statusUnpublished)) {
-            $page->jk_publish_from = NULL;
-            $page->save('jk_publish_from');
-        }
+      $page = $event->arguments(0);
+      if ($page->is(Page::statusUnpublished)) {
+        $page->jk_publish_from = NULL;
+        $page->save('jk_publish_from');
+      }
     }
 
     /**
      * Add or remove publishing fields from templates after saving the module config page
      * If a template is not checked in the modul config, then all publishing fields will be removed from it, otherwise they will be added to the template
      */
-
     protected function addRemovePublishingFields() {
-        $jk_publish_from = wire('fields')->get('jk_publish_from');
-        $jk_publish_until = wire('fields')->get('jk_publish_until');
-        $jk_publish_open = wire('fields')->get('jk_publish_open');
-        $jk_publish_close = wire('fields')->get('jk_publish_open' . FieldtypeFieldsetOpen::fieldsetCloseIdentifier);
 
-        foreach ($this->getTemplates() as $template) {
-            $currentTempl = wire('templates')->get($template);
-            if (in_array($template, $this->JkpublishingOptionsTemplates)) {
-                if (!$currentTempl->hasField('jk_publish_from')) {
-                    //not present so add this 2 fields to the template
-                    $currentTempl->fieldgroup->add($jk_publish_open);
-                    $currentTempl->fieldgroup->add($jk_publish_from);
-                    $currentTempl->fieldgroup->add($jk_publish_until);
-                    $currentTempl->fieldgroup->add($jk_publish_close);
-                }
+      foreach ($this->getTemplates() as $template) {
+        $currentTempl = wire('templates')->get($template);
+        if (in_array($template, $this->JkpublishingOptionsTemplates)) {
+
+          foreach($this->moduleFields as $fieldName){
+            $field = wire('fields')->get($fieldName);
+            if (!$currentTempl->hasField($fieldName)) { //check
+              $currentTempl->fieldgroup->add($field);
             }
-            else {
-                $currentTempl->fieldgroup->remove('jk_publish_open');
-                $currentTempl->fieldgroup->remove('jk_publish_from');
-                $currentTempl->fieldgroup->remove('jk_publish_until');
-                $currentTempl->fieldgroup->remove('jk_publish_open' . FieldtypeFieldsetOpen::fieldsetCloseIdentifier);
-            }
-            $currentTempl->fieldgroup->save();
+          }
+          } else {
+            foreach($this->moduleFields as $fieldName){
+              $currentTempl->fieldgroup->remove($fieldName);
+          }
         }
 
+        $currentTempl->fieldgroup->save();
+      }
+
+    }
+
+    /**
+    * Method to add translation to the labels of fields created by this module
+    * @param HookEvent
+    */
+    protected function addTranslationsToFields(HookEvent $event){
+       // get the language object of the uploaded translation csv file
+      $language = $event->arguments(1);
+
+      $translation = new LanguageTranslator($language);
+
+      foreach($this->jkFields as $fieldName){
+        //grab the field object
+        $field = $this->wire('fields')->get($fieldName);
+        $label = $translation->getTranslation($this, $field->label);
+        $field->set("label{$language->id}", $label);
+        $field->save('label');
+      }
     }
 
     /**
@@ -201,25 +230,26 @@ class JkPublishingOptions extends WireData implements Module, ConfigurableModule
      * This method is much more user friendly than showing an exception
      */
     protected function disableUninstall(HookEvent $event) {
-        $moduleName = (new \ReflectionClass(get_called_class()))->getShortName(); //returns the class/module name
-        if ($event->wire()->input->get('name') !== $moduleName) return;
-        $event->wire()->addHookBefore('InputfieldForm::render', function (HookEvent $event) use ($moduleName) {
-            /** @var InputfieldForm $form */
-            $form = $event->object;
-            if ($form->id !== 'ModuleEditForm') return;
-            $your_module = $event->wire()->modules->get($moduleName);
-            $fieldsInTemplate = [];
-            $moduleFields = ['jk_publish_from', 'jk_publish_until', 'jk_publish_open', 'jk_publish_open' . FieldtypeFieldsetOpen::fieldsetCloseIdentifier];
-            foreach ($moduleFields as $moduleField) {
-                $field = wire('fields')->get($moduleField);
-                if ($field && $field->numFieldgroups() > 0) $fieldsInTemplate[] = $moduleField;
-            }
-            if (count($fieldsInTemplate)) {
-                $uninstall = $form->getChildByName('uninstall');
-                $uninstall->description($this->_('You may not uninstall this module because some templates have publishing fields inside. Please remove these fields from the templates first. Use the checkboxes above, uncheck them at all and press the save button. Afterwards you will be able to uninstall this module.'));
-                $uninstall->attr('disabled', 'disabled');
-            }
-        });
+      $moduleName = $this->className(); //returns the class/module name without namespace
+
+      if ($event->wire()->input->get('name')!== $moduleName) return;
+      $event->wire()->addHookBefore('InputfieldForm::render', function (HookEvent $event) use ($moduleName) {
+        /** @var InputfieldForm $form */
+        $form = $event->object;
+        if ($form->id !== 'ModuleEditForm') return;
+        $your_module = $event->wire()->modules->get($moduleName);
+        $fieldsInTemplate = [];
+
+        foreach ($this->moduleFields as $moduleField) {
+          $field = wire('fields')->get($moduleField);
+          if ($field && $field->numFieldgroups() > 0) $fieldsInTemplate[] = $moduleField;
+        }
+        if (count($fieldsInTemplate)) {
+          $uninstall = $form->getChildByName('uninstall');
+          $uninstall->description($this->_('You may not uninstall this module because some templates have publishing fields inside. Please remove these fields from the templates first. Use the checkboxes above, uncheck them at all and press the save button. Afterwards you will be able to uninstall this module.'));
+          $uninstall->attr('disabled', 'disabled');
+        }
+      });
     }
 
     /**
@@ -233,129 +263,128 @@ class JkPublishingOptions extends WireData implements Module, ConfigurableModule
 
     protected function getTemplates(): array
     {
-        $templates = [];
-        foreach (wire('templates')->find('flags!="8"') as $template) {
-            $templates[] = $template->name;
-        }
-        return $templates;
+      $templates = [];
+      foreach (wire('templates')->find('flags!="8"') as $template) {
+        $templates[] = $template->name;
+      }
+      return $templates;
     }
 
     // Add additional configuration fields
     public function ___getModuleConfigInputfields($inputfields) {
 
-        // create array of CronJob intervals
-        $intervals = [
-          'every30Seconds' => $this->_('Every 30 seconds') ,
-          'everyMinute' => $this->_('Every minute') ,
-          'every2Minutes' => $this->_('Every 2 minutes') ,
-          'every3Minutes' => $this->_('Every 3 minutes') ,
-          'every4Minutes' => $this->_('Every 4 minutes') ,
-          'every5Minutes' => $this->_('Every 5 minutes') ,
-          'every10Minutes' => $this->_('Every 10 minutes') ,
-          'every15Minutes' => $this->_('Every 15 minutes') ,
-          'every30Minutes' => $this->_('Every 30 minutes') ,
-          'every45Minutes' => $this->_('Every 45 minutes') ,
-          'everyHour' => $this->_('Every hour') ,
-          'every2Hours' => $this->_('Every 2 hours') ,
-          'every4Hours' => $this->_('Every 4 hours') ,
-          'every6Hours' => $this->_('Every 6 hours') ,
-          'every12Hours' => $this->_('Every 12 hours') ,
-          'everyDay' => $this->_('Every day') ,
-          'every2Days' => $this->_('Every 2 days') ,
-          'every4Days' => $this->_('Every 4 days') ,
-          'everyWeek' => $this->_('Every week') ,
-          'every2Weeks' => $this->_('Every 2 weeks') ,
-          'every4Weeks' => $this->_('Every 4 weeks')
-        ];
+      // create array of CronJob intervals
+      $intervals = [
+        'every30Seconds' => $this->_('Every 30 seconds') ,
+        'everyMinute' => $this->_('Every minute') ,
+        'every2Minutes' => $this->_('Every 2 minutes') ,
+        'every3Minutes' => $this->_('Every 3 minutes') ,
+        'every4Minutes' => $this->_('Every 4 minutes') ,
+        'every5Minutes' => $this->_('Every 5 minutes') ,
+        'every10Minutes' => $this->_('Every 10 minutes') ,
+        'every15Minutes' => $this->_('Every 15 minutes') ,
+        'every30Minutes' => $this->_('Every 30 minutes') ,
+        'every45Minutes' => $this->_('Every 45 minutes') ,
+        'everyHour' => $this->_('Every hour') ,
+        'every2Hours' => $this->_('Every 2 hours') ,
+        'every4Hours' => $this->_('Every 4 hours') ,
+        'every6Hours' => $this->_('Every 6 hours') ,
+        'every12Hours' => $this->_('Every 12 hours') ,
+        'everyDay' => $this->_('Every day') ,
+        'every2Days' => $this->_('Every 2 days') ,
+        'every4Days' => $this->_('Every 4 days') ,
+        'everyWeek' => $this->_('Every week') ,
+        'every2Weeks' => $this->_('Every 2 weeks') ,
+        'every4Weeks' => $this->_('Every 4 weeks')
+      ];
 
-        // create select to choose the interval
-        $f = $this->modules->get('InputfieldSelect');
-        $f->label = $this->_('Cron Interval');
-        $f->attr('name', 'input_croninterval');
-        $f->addOptions($intervals);
-        $f->attr("value", $this->input_croninterval ? $this->input_croninterval : 'everyHour'); // default is 1 hour
-        $f->required = 1;
-        $inputfields->append($f);
+      // create select to choose the interval
+      $f = $this->modules->get('InputfieldSelect');
+      $f->label = $this->_('Cron Interval');
+      $f->attr('name', 'input_croninterval');
+      $f->addOptions($intervals);
+      $f->attr("value", $this->input_croninterval ? $this->input_croninterval : 'everyHour'); // default is 1 hour
+      $f->required = 1;
+      $inputfields->append($f);
 
-        // create checkboxes for each frontend template to add or remove publish_from and publish_until fields from this field
-        $f = $this->modules->get('InputfieldCheckboxes');
-        $f->label = $this->_('Add fields to templates');
-        $f->attr('name', 'input_templates');
-        $values = (isset($this->hasField->data['input_required'])) ? $this->hasField->data['input_required'] : [];
-        //$templatesFields = wire('modules')->getConfig($this, 'input_templates');
-        foreach ($this->getTemplates() as $templateName) {
-            $checked = ($this->JkpublishingOptionsTemplates != null && in_array($templateName, $this->JkpublishingOptionsTemplates)) ? 'checked' : '';
-            $f->addOption($templateName, $templateName, ['checked' => $checked]);
-        }
-        //}
-        $f->description = $this->_('If a template is checked, than the publishing fields are present in this template or will be added to this template after pressing the save button. On all other templates these fields are not present or will be removed after pressing the save button.');
-        $f->notes = $this->_('Please select all templates where you want to add the publishing fields and press the save button afterwards.');
-        $inputfields->append($f);
+      // create checkboxes for each frontend template to add or remove publish_from and publish_until fields from this field
+      $f = $this->modules->get('InputfieldCheckboxes');
+      $f->label = $this->_('Add fields to templates');
+      $f->attr('name', 'input_templates');
+      $values = (isset($this->hasField->data['input_required'])) ? $this->hasField->data['input_required'] : [];
+
+      foreach ($this->getTemplates() as $templateName) {
+        $checked = ($this->JkpublishingOptionsTemplates != null && in_array($templateName, $this->JkpublishingOptionsTemplates)) ? 'checked' : '';
+        $f->addOption($templateName, $templateName, ['checked' => $checked]);
+      }
+
+      $f->description = $this->_('If a template is checked, than the publishing fields are present in this template or will be added to this template after pressing the save button. On all other templates these fields are not present or will be removed after pressing the save button.');
+      $f->notes = $this->_('Please select all templates where you want to add the publishing fields and press the save button afterwards.');
+      $inputfields->append($f);
 
     }
 
     /**
      * Install necessary fields if they are not present
      */
-
     public function ___install() {
-        // Add the required fields for this module
-        if (!wire('fields')->get('jk_publish_from')) {
-            $field = new Field();
-            $field->type = $this->modules->get("FieldtypeDatetime");
-            $field->name = 'jk_publish_from';
-            $field->label = $this->_('Publish From Date');
-            $field->dateOutputFormat = 'd-m-Y H:i:s';
-            $field->dateInputFormat = 'd-M-Y';
-            $field->datepicker = 3; // if you want datepicker enabled
-            $field->timeInputFormat = 'H:i';
-            $field->yearRange = '+0:+10';
-            $field->defaultToday = 0; // if you want dates to default to today
-            $field->columnWidth = 50;
-            $field->save();
-        }
+      // Add the required fields for this module
+      if (!wire('fields')->get('jk_publish_from')) {
+        $field = new Field();
+        $field->type = $this->modules->get("FieldtypeDatetime");
+        $field->name = 'jk_publish_from';
+        $field->label = $this->_('Publish From Date');
+        $field->dateOutputFormat = 'd-m-Y H:i:s';
+        $field->dateInputFormat = 'd-M-Y';
+        $field->datepicker = 3; // if you want datepicker enabled
+        $field->timeInputFormat = 'H:i';
+        $field->yearRange = '+0:+10';
+        $field->defaultToday = 0; // if you want dates to default to today
+        $field->columnWidth = 50;
+        $field->save();
+      }
 
-        if (!wire('fields')->get('jk_publish_until')) {
-            $field = new Field();
-            $field->type = $this->modules->get("FieldtypeDatetime");
-            $field->name = 'jk_publish_until';
-            $field->label = $this->_('Publish Until Date');
-            $field->dateOutputFormat = 'd-m-Y H:i:s';
-            $field->dateInputFormat = 'd-M-Y';
-            $field->datepicker = 3; // if you want datepicker enabled
-            $field->timeInputFormat = 'H:i';
-            $field->yearRange = '+0:+10';
-            $field->defaultToday = 0; // if you want dates to default to today
-            $field->columnWidth = 50;
-            $field->save();
-        }
+      if (!wire('fields')->get('jk_publish_until')) {
+        $field = new Field();
+        $field->type = $this->modules->get("FieldtypeDatetime");
+        $field->name = 'jk_publish_until';
+        $field->label = $this->_('Publish Until Date');
+        $field->dateOutputFormat = 'd-m-Y H:i:s';
+        $field->dateInputFormat = 'd-M-Y';
+        $field->datepicker = 3; // if you want datepicker enabled
+        $field->timeInputFormat = 'H:i';
+        $field->yearRange = '+0:+10';
+        $field->defaultToday = 0; // if you want dates to default to today
+        $field->columnWidth = 50;
+        $field->save();
+      }
 
-        // create fieldset
-        if (!wire('fields')->get('jk_publish_open')) {
-            $opener = new Field();
-            $opener->type = new FieldtypeFieldsetOpen();
-            $opener->name = "jk_publish_open";
-            $opener->label = $this->_('Publishing options');
-            $opener->save();
+      // create fieldset
+      if (!wire('fields')->get('jk_publish_open')) {
+        $opener = new Field();
+        $opener->type = new FieldtypeFieldsetOpen();
+        $opener->name = "jk_publish_open";
+        $opener->label = $this->_('Publishing options');
+        $opener->save();
 
-            $closer = new Field();
-            $closer->type = new FieldtypeFieldsetClose();
-            $closer->name = "jk_publish_open" . FieldtypeFieldsetOpen::fieldsetCloseIdentifier;
-            $closer->save();
-        }
+        $closer = new Field();
+        $closer->type = new FieldtypeFieldsetClose();
+        $closer->name = "jk_publish_open" . FieldtypeFieldsetOpen::fieldsetCloseIdentifier;
+        $closer->save();
+      }
 
     }
 
     public function ___uninstall() {
-        // Remove the module's fields if the module is uninstalled
-        $moduleFields = ['jk_publish_from', 'jk_publish_until', 'jk_publish_open', 'jk_publish_open' . FieldtypeFieldsetOpen::fieldsetCloseIdentifier];
-        foreach ($moduleFields as $moduleField) {
-            $field = wire('fields')->get($moduleField);
-            if ($field && $field->numFieldgroups() > 0)
-            // this prevents uninstallation of the module if there are publishing fields in some templates left
-            throw new WireException(sprintf($this->_("Cannot uninstall because the field %s is still being used. Please remove the fields %s from any templates.") , $moduleField, implode(', ', $moduleFields)));
-            if ($field) wire('fields')->delete($field);
-        }
+      // Remove the module's fields if the module is uninstalled
+      $moduleFields = ['jk_publish_from', 'jk_publish_until', 'jk_publish_open', 'jk_publish_open' . FieldtypeFieldsetOpen::fieldsetCloseIdentifier];
+      foreach ($moduleFields as $moduleField) {
+        $field = wire('fields')->get($moduleField);
+        if ($field && $field->numFieldgroups() > 0)
+        // this prevents uninstallation of the module if there are publishing fields in some templates left
+        throw new WireException(sprintf($this->_("Cannot uninstall because the field %s is still being used. Please remove the fields %s from any templates.") , $moduleField, implode(', ', $moduleFields)));
+        if ($field) wire('fields')->delete($field);
+      }
     }
 
 }
