@@ -184,20 +184,20 @@ class JkPublishingOptions extends WireData implements Module, ConfigurableModule
     protected function addRemovePublishingFields() {
 
       foreach ($this->getTemplates() as $template) {
+
         $currentTempl = wire('templates')->get($template);
         if (in_array($template, $this->JkpublishingOptionsTemplates)) {
-
           foreach($this->moduleFields as $fieldName){
             $field = wire('fields')->get($fieldName);
             if (!$currentTempl->hasField($fieldName)) { //check
               $currentTempl->fieldgroup->add($field);
             }
           }
-          } else {
-            foreach($this->moduleFields as $fieldName){
-              $currentTempl->fieldgroup->remove($fieldName);
-          }
+        } else {
+          foreach($this->moduleFields as $fieldName){
+            $currentTempl->fieldgroup->remove($fieldName);
         }
+      }
 
         $currentTempl->fieldgroup->save();
       }
@@ -377,8 +377,7 @@ class JkPublishingOptions extends WireData implements Module, ConfigurableModule
 
     public function ___uninstall() {
       // Remove the module's fields if the module is uninstalled
-      $moduleFields = ['jk_publish_from', 'jk_publish_until', 'jk_publish_open', 'jk_publish_open' . FieldtypeFieldsetOpen::fieldsetCloseIdentifier];
-      foreach ($moduleFields as $moduleField) {
+      foreach ($this->moduleFields as $moduleField) {
         $field = wire('fields')->get($moduleField);
         if ($field && $field->numFieldgroups() > 0)
         // this prevents uninstallation of the module if there are publishing fields in some templates left
