@@ -81,6 +81,11 @@ class JkPublishingOptions extends WireData implements Module, ConfigurableModule
     }
 
     public function init() {
+      $info = $this->getModuleInfo();
+      $version = $info['version'];
+      //Add JS and CSS file for the checkboxes
+      $this->config->scripts->add($this->config->urls->{$this->className()} . 'JkPublishingOptions.js?v='.$version);
+      $this->config->styles->add($this->config->urls->{$this->className()} . 'JkPublishingOptions.css?v='.$version);
       $this->addHook("LazyCron::{$this->input_croninterval}", $this, 'runJkPublishingOptions');
       $this->addHookAfter('InputfieldDatetime::processInput', $this, 'validateDates');
       $this->addHookBefore('Pages::save', $this, 'beforePageSave');
@@ -312,7 +317,9 @@ class JkPublishingOptions extends WireData implements Module, ConfigurableModule
       $f->label = $this->_('Add fields to templates');
       $f->attr('name', 'input_templates');
       $values = (isset($this->hasField->data['input_required'])) ? $this->hasField->data['input_required'] : [];
-
+      // add the check/uncheck all checkbox at the top
+      $allchecked = false;
+      $f->addOption('0', $this->_('Check/uncheck all Templates'));
       foreach ($this->getTemplates() as $templateName) {
         $checked = ($this->JkpublishingOptionsTemplates != null && in_array($templateName, $this->JkpublishingOptionsTemplates)) ? 'checked' : '';
         $f->addOption($templateName, $templateName, ['checked' => $checked]);
