@@ -11,7 +11,7 @@ This module is inspired by the SchedulePages module, but the code is completely 
 This module creates 2 new Datetime Inputfields and a new Fieldset for holding the inputs.
 
 ## Module configuration fields
-![alt text](https://raw.githubusercontent.com/juergenweb/JKPublishingOptions/main/configuration.jpg)
+![alt text](https://raw.githubusercontent.com/juergenweb/JKPublishingOptions/main/configuration.jpg?v=1)
 
 As you can see, you have a select input with all LazyCron time intervals - default is 1 hour.
 Afterwards is a list of checkboxes. Each checkbox represents a frontend template where you can add the publishing fields.
