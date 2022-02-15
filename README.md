@@ -21,7 +21,7 @@ So there is no longer the need to add or remove the publishing fields manually t
 
 As mentioned above the uninstall checkbox will be disabled if one or more templates contain publishing fields.
 
-![alt text](https://raw.githubusercontent.com/juergenweb/JKPublishingOptions/main/disabled.jpg)
+![alt text](https://raw.githubusercontent.com/juergenweb/JKPublishingOptions/main/disabled.jpg?v=1)
 
 
 ## Template view
