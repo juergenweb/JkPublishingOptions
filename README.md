@@ -42,10 +42,10 @@ If you want to change the labels of the input fields or the title of the fieldse
 
 ## Multilanguage
 
-This module will be shipped with the German translation file. You will need ProcessWire 3.0.181 or higher to import this translations. Otherwise you have to translate the strings by yourself.
-The translations for the 2 external fields and the fieldset will be also included. In this case you will need ProcessWire 3.0.195 or higher to automatically install the translations in the extra fields too.
-If your version is lower, you have to add the translations manually.
-The reason is that the processCSV method has to be hooked and this is only possible since the previous mentioned version of ProcessWire.
+This module will be shipped with the German translation file. You will need ProcessWire 3.0.181 or higher to import these translations. Otherwise you have to translate the strings by yourself.
+The translations for the 2 external fields and the fieldset will be also included. In this case you will need ProcessWire 3.0.195 or higher to automatically store the translations in the extra fields too.
+If your version is lower, you have to add the translations for these fields manually.
+The reason is that the processCSV method has to be hookable and this is only possible since the 3.0.195 version of ProcessWire.
 
 ## How to install
 
