@@ -1,0 +1,5 @@
+
+#wrap_Inputfield_input_templates ul li:first-of-type {
+  text-transform: uppercase;
+  margin-bottom: 10px!important;
+}
