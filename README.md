@@ -5,6 +5,7 @@ This module is inspired by the SchedulePages module, but the code is completely 
 * Publish from and publish until date inputs will be surrounded by a fieldset
 * Includes more LazyCron time intervals
 * You can add/remove publishing fields from specific templates from the module configuration - no need to add/remove them manually from templates
+* Contains a select/unselect all templates checkbox for better usability
 * Uninstall checkbox is disabled until publishing fields are removed from all templates
 
 This module creates 2 new Datetime Inputfields and a new Fieldset for holding the inputs.
