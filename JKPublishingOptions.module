@@ -38,7 +38,7 @@ class JkPublishingOptions extends WireData implements Module, ConfigurableModule
 
     protected $JkpublishingOptionsTemplates = []; // numeric array the holds the name of the templates which include the publishing fields
     protected $jkFields = ['jk_publish_from', 'jk_publish_until', 'jk_publish_open']; // array of the fields that were created by this module
-    protected $moduleFields = [];
+    protected $moduleFields = []; // array of the fields (including closing fieldset) in the correct order
 
     public static function getModuleInfo() {
 
@@ -53,7 +53,7 @@ class JkPublishingOptions extends WireData implements Module, ConfigurableModule
           'requires' => [
             'LazyCron',
             'PHP>=7.2.0',
-            'ProcessWire>=3.0.0'
+            'ProcessWire>=3.0.181'
             ]
           ];
 
@@ -74,16 +74,15 @@ class JkPublishingOptions extends WireData implements Module, ConfigurableModule
     private function sortModuleFields(){
       $moduleFields = array_merge($this->jkFields, [$this->jkFields[array_key_last($this->jkFields)] . FieldtypeFieldsetOpen::fieldsetCloseIdentifier]); // add the closing fieldset field to the array
       // add fieldset fields at top and bottom
-      $new_value = $moduleFields[2];
+      $fieldsetField = $moduleFields[2];
       unset($moduleFields[2]);
-      array_unshift($moduleFields, $new_value);
+      array_unshift($moduleFields, $fieldsetField);
       $this->moduleFields = $moduleFields;
     }
 
     public function init() {
-      $info = $this->getModuleInfo();
-      $version = $info['version'];
-      //Add JS and CSS file for the checkboxes
+      $version = $this->getModuleInfo()['version'];
+      //Add JS and CSS file for the multiple checkboxes
       $this->config->scripts->add($this->config->urls->{$this->className()} . 'JkPublishingOptions.js?v='.$version);
       $this->config->styles->add($this->config->urls->{$this->className()} . 'JkPublishingOptions.css?v='.$version);
       $this->addHook("LazyCron::{$this->input_croninterval}", $this, 'runJkPublishingOptions');
@@ -131,7 +130,7 @@ class JkPublishingOptions extends WireData implements Module, ConfigurableModule
      */
     protected function runJkPublishingOptions() {
 
-      $templateSelector = count($this->JkpublishingOptionsTemplates) ? 'template=' . implode('|', $this->JkpublishingOptionsTemplates) . ',' : '';
+      $templateSelector = $this->JkpublishingOptionsTemplates ? 'template=' . implode('|', $this->JkpublishingOptionsTemplates) . ',' : '';
       $unpublishedPages = wire("pages")->find("status=unpublished,has_parent!=" . wire("config")->adminRootPageID . ",has_parent!=" . wire("config")->trashPageID . ",$templateSelector(jk_publish_from<=now, jk_publish_until>=''),(jk_publish_from<=now, jk_publish_until>=now)");
       $publishedPages = wire("pages")->find("status=published,has_parent!=" . wire("config")->adminRootPageID . ",has_parent!=" . wire("config")->trashPageID . ",$templateSelector(jk_publish_from>=now, jk_publish_until>=now),(jk_publish_from>=now, jk_publish_until<=now),(jk_publish_from>=now, jk_publish_until=''),(jk_publish_from<=now, jk_publish_until<=now)");
 
@@ -177,7 +176,7 @@ class JkPublishingOptions extends WireData implements Module, ConfigurableModule
     protected function afterPageSaved(HookEvent $event) {
       $page = $event->arguments(0);
       if ($page->is(Page::statusUnpublished)) {
-        $page->jk_publish_from = NULL;
+        $page->jk_publish_from = NULL; // remove value
         $page->save('jk_publish_from');
       }
     }
@@ -194,14 +193,14 @@ class JkPublishingOptions extends WireData implements Module, ConfigurableModule
         if (in_array($template, $this->JkpublishingOptionsTemplates)) {
           foreach($this->moduleFields as $fieldName){
             $field = wire('fields')->get($fieldName);
-            if (!$currentTempl->hasField($fieldName)) { //check
+            if (!$currentTempl->hasField($fieldName)) {
               $currentTempl->fieldgroup->add($field);
             }
           }
         } else {
           foreach($this->moduleFields as $fieldName){
             $currentTempl->fieldgroup->remove($fieldName);
-        }
+          }
       }
 
         $currentTempl->fieldgroup->save();
@@ -209,8 +208,11 @@ class JkPublishingOptions extends WireData implements Module, ConfigurableModule
 
     }
 
+
     /**
     * Method to add translation to the labels of fields created by this module
+    * Onyl works if ProcessWire version is equal or higher 3.0.195
+    * After uploading the csv translation file, the translations will be also stored at the created fields
     * @param HookEvent
     */
     protected function addTranslationsToFields(HookEvent $event){
@@ -249,7 +251,7 @@ class JkPublishingOptions extends WireData implements Module, ConfigurableModule
           $field = wire('fields')->get($moduleField);
           if ($field && $field->numFieldgroups() > 0) $fieldsInTemplate[] = $moduleField;
         }
-        if (count($fieldsInTemplate)) {
+        if ($fieldsInTemplate) {
           $uninstall = $form->getChildByName('uninstall');
           $uninstall->description($this->_('You may not uninstall this module because some templates have publishing fields inside. Please remove these fields from the templates first. Use the checkboxes above, uncheck them at all and press the save button. Afterwards you will be able to uninstall this module.'));
           $uninstall->attr('disabled', 'disabled');
